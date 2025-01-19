@@ -11,6 +11,8 @@ BIN_DIR:=bin
 BUILD_DIR:=build
 LIB_DIR:=lib
 SHADER_DIR:=assets
+TEST_DIR:=test
+DATA_DIR:=data
 SRC_EXTENSION:=cc
 HEADER_EXTENSION:=hh
 TEMPLATE_EXTENSION:=tcc
@@ -32,14 +34,14 @@ DEBUG_FLAGS:=-g -Wall
 DEBUG_CFLAGS:=
 DEBUG_LFLAGS:=
 
-STARTING_POINTS:=test game editor
+STARTING_POINTS:=test cdxg editor
 EXEC=none
 
 #~PROCESSED VAR
 HEADERS:=$(wildcard ./$(INCLUDE_DIR)/*.$(HEADER_EXTENSION)) $(wildcard ./$(TEMPLATE_DIR)/*.$(TEMPLATE_EXTENSION))
 SRC:=$(foreach file,$(foreach file,$(wildcard ./$(SRC_DIR)/*.$(SRC_EXTENSION)),$(file)),$(if $(findstring $(file:./$(SRC_DIR)/%.$(SRC_EXTENSION)=%),$(STARTING_POINTS)),,$(file)))
-OBJ=./$(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION) $(foreach file,$(wildcard ./$(LIB_DIR)/*),$(file:./$(LIB_DIR)/%=./$(BIN_DIR)/%.$(OBJ_EXTENSION))) $(foreach file,$(SRC) $(if $(findstring none,$(EXEC)),,./$(SRC_DIR)/$(EXEC).$(SRC_EXTENSION)),$(file:./$(SRC_DIR)/%=./$(BIN_DIR)/%.$(OBJ_EXTENSION)))
-DEP=$(OBJ:%.$(OBJ_EXTENSION)=%.$(DEP_EXTENSION))
+OBJ=./$(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION) $(foreach file,$(filter-out %.$(OBJ_EXTENSION),$(wildcard ./$(LIB_DIR)/*)),$(file:%=%.$(OBJ_EXTENSION))) $(foreach file,$(SRC) $(if $(findstring none,$(EXEC)),,./$(SRC_DIR)/$(EXEC).$(SRC_EXTENSION)),$(file:./$(SRC_DIR)/%=./$(BIN_DIR)/%.$(OBJ_EXTENSION)))
+DEP=$(wildcard ./$(BIN_DIR)/*.d)
 SHADERS:=$(wildcard ./$(SHADER_DIR)/*.$(SHADER_EXTENSION))
 
 #^ run command arguments parsing into RUN_ARGS
@@ -53,11 +55,16 @@ endif
 
 .PHONY: all reset
 
-all: $(STARTING_POINTS)
+all: $(DATA_DIR)_rule $(STARTING_POINTS)
+	cp -rf $(BIN_DIR)/*.$(EXEC_EXTENSION) $(TEST_DIR)
 
 reset:
 	rm -rf $(BIN_DIR)
 	rm -rf $(BUILD_DIR)
+	rm -rf $(TEST_DIR)
+
+reset_lib:
+	rm -rf $(LIB_DIR)/*.$(OBJ_EXTENSION)
 
 build: $(BUILD_DIR)_rule $(STARTING_POINTS:%=build.%)
 	rm -f $(BUILD_DIR)/*.d
@@ -72,7 +79,13 @@ $(BIN_DIR)_rule:
 $(BUILD_DIR)_rule:
 	mkdir -p $(BUILD_DIR)
 
-$(BIN_DIR)/%.$(OBJ_EXTENSION): $(LIB_DIR)/%
+$(TEST_DIR)_rule:
+	mkdir -p $(TEST_DIR)
+
+$(DATA_DIR)_rule: $(TEST_DIR)_rule
+	cp -rf $(DATA_DIR) $(TEST_DIR)/$(DATA_DIR)
+
+$(LIB_DIR)/%.$(OBJ_EXTENSION): $(LIB_DIR)/%
 	$(COMPILER) $(FLAGS) $(CFLAGS) $(DEBUG_FLAGS) $(DEBUG_CFLAGS) -c -o $@ $<
 
 -include $(DEP)
@@ -112,17 +125,17 @@ build.editor: $(OBJ:./$(BIN_DIR)/%=./$(BUILD_DIR)/%)
 	$(COMPILER) $(FLAGS) $(LFLAGS) $(BUILD_FLAGS) $(BUILD_LFLAGS) -o $(BUILD_DIR)/editor.$(EXEC_EXTENSION) $^
 
 #****************************************************************
-#						   	   GAME
+#						   	   CDXG
 #****************************************************************
-EXEC=game
+EXEC=cdxg
 
-game: $(BIN_DIR)_rule .game
+cdxg: $(BIN_DIR)_rule .cdxg
 
-.game: $(OBJ)
-	$(COMPILER) $(FLAGS) $(LFLAGS) $(DEBUG_FLAGS) $(DEBUG_LFLAGS) -o $(BIN_DIR)/game.$(EXEC_EXTENSION) $^
+.cdxg: $(OBJ)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(DEBUG_FLAGS) $(DEBUG_LFLAGS) -o $(BIN_DIR)/cdxg.$(EXEC_EXTENSION) $^
 
-build.game: $(OBJ:./$(BIN_DIR)/%=./$(BUILD_DIR)/%)
-	$(COMPILER) $(FLAGS) $(LFLAGS) $(BUILD_FLAGS) $(BUILD_LFLAGS) -o $(BUILD_DIR)/game..$(EXEC_EXTENSION) $^
+build.cdxg: $(OBJ:./$(BIN_DIR)/%=./$(BUILD_DIR)/%)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(BUILD_FLAGS) $(BUILD_LFLAGS) -o $(BUILD_DIR)/cdxg..$(EXEC_EXTENSION) $^
 
 #****************************************************************
 #					  	     TEST EXEC

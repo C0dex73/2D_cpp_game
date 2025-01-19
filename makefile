@@ -1,110 +1,138 @@
+#****************************************************************
+#						      GLOBAL
+#****************************************************************
 #~CONSTANTS
-SRC_DIR=./src
-BIN_DIR=./bin
-BUILD_DIR=./build
-EXEC=cdxg.exe
-TEST_EXEC=test.exe
-TEST_SUBEXT=.test
-C=g++
-SRCEXTENSION=.cc
-OBJEXTENSION=.cc.o
-INCLUDE=./include
-HEADEREXTENSION=.hh
-SHADER_DIR=./assets
-SHADER_EXTENSION=.glsl
-CFLAGS=-mwindows -Wall -std=c++17 -I./include
-C2OFLAGS=-W
-ADDITIONALOBJFILES=lib/glad.o bin/rawShaders.o
-O2EXEFLAGS=-lglfw3 -lopengl32
+
+#files
+SRC_DIR:=src
+INCLUDE_DIR:=include
+TEMPLATE_DIR:=include/templates
+BIN_DIR:=bin
+BUILD_DIR:=build
+LIB_DIR:=lib
+SHADER_DIR:=assets
+SRC_EXTENSION:=cc
+HEADER_EXTENSION:=hh
+TEMPLATE_EXTENSION:=tcc
+OBJ_EXTENSION:=o
+DEP_EXTENSION:=d
+EXEC_EXTENSION:=run
+SHADER_EXTENSION:=glsl
+SHADER_OBJ:=rawShaders
+
+#compiler/linker
+COMPILER:=g++
+FLAGS:=-std=c++20 -I./$(INCLUDE_DIR) -I./$(TEMPLATE_DIR)
+CFLAGS:=
+LFLAGS:=-lglfw -lGL
+BUILD_FLAGS:=-s
+BUILD_CFLAGS:=
+BUILD_LFLAGS:=
+DEBUG_FLAGS:=-g -Wall
+DEBUG_CFLAGS:=
+DEBUG_LFLAGS:=
+
+STARTING_POINTS:=test game editor
+EXEC=none
 
 #~PROCESSED VAR
-SHADER_FILES=$(wildcard $(SHADER_DIR)/*$(SHADER_EXTENSION))
-RAW_SRC_FILES_PATH=$(wildcard $(SRC_DIR)/*$(SRCEXTENSION))
-SOURCE_FILES=$(foreach file, $(RAW_SRC_FILES_PATH:$(SRC_DIR)/%=%), $(if $(findstring $(TEST_SUBEXT),$(file)),,$(file)))
-SRC=$(foreach file, $(SOURCE_FILES), $(SRC_DIR)/$(file))
-OBJ=$(foreach file, $(SOURCE_FILES), $(BIN_DIR)/$(file:$(SRCEXTENSION)=$(OBJEXTENSION)))
-TEST_FILES=$(foreach file, $(RAW_SRC_FILES_PATH:$(SRC_DIR)/%=%), $(if $(findstring $(TEST_SUBEXT),$(file)),$(file)))
-TEST_SRC=$(foreach file, $(TEST_FILES), $(SRC_DIR)/$(file))
-TEST_OBJ=$(foreach file, $(TEST_FILES), $(BIN_DIR)/$(file:$(SRCEXTENSION)=$(OBJEXTENSION)))
+HEADERS:=$(wildcard ./$(INCLUDE_DIR)/*.$(HEADER_EXTENSION)) $(wildcard ./$(TEMPLATE_DIR)/*.$(TEMPLATE_EXTENSION))
+SRC:=$(foreach file,$(foreach file,$(wildcard ./$(SRC_DIR)/*.$(SRC_EXTENSION)),$(file)),$(if $(findstring $(file:./$(SRC_DIR)/%.$(SRC_EXTENSION)=%),$(STARTING_POINTS)),,$(file)))
+OBJ=./$(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION) $(foreach file,$(wildcard ./$(LIB_DIR)/*),$(file:./$(LIB_DIR)/%=./$(BIN_DIR)/%.$(OBJ_EXTENSION))) $(foreach file,$(SRC) $(if $(findstring none,$(EXEC)),,./$(SRC_DIR)/$(EXEC).$(SRC_EXTENSION)),$(file:./$(SRC_DIR)/%=./$(BIN_DIR)/%.$(OBJ_EXTENSION)))
+DEP=$(OBJ:%.$(OBJ_EXTENSION)=%.$(DEP_EXTENSION))
+SHADERS:=$(wildcard ./$(SHADER_DIR)/*.$(SHADER_EXTENSION))
 
 #^ run command arguments parsing into RUN_ARGS
-ifneq (,$(filter $(firstword $(MAKECMDGOALS)), run fullauto))
+RULES_WITH_CONSOLE_ARGS:=
+ifneq (,$(filter $(firstword $(MAKECMDGOALS)), $(RULES_WITH_CONSOLE_ARGS)))
   RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   $(eval $(RUN_ARGS):;@:)
 endif
 
 #~MAKEFILE
 
-all: $(BIN_DIR)_dir $(BIN_DIR)/$(EXEC) $(BIN_DIR)/$(TEST_EXEC)
+.PHONY: all reset
 
-$(BIN_DIR)/$(EXEC): $(OBJ) $(ADDITIONALOBJFILES)
-	$(C) $(CFLAGS) -o $@ $^ $(O2EXEFLAGS)
-
-$(BIN_DIR)/%$(OBJEXTENSION): $(SRC_DIR)/%$(SRCEXTENSION) $(INCLUDE)/%$(HEADEREXTENSION)
-	$(C) $(CFLAGS) -c -o $@ $< $($@) $(C2OFLAGS)
-
-$(BIN_DIR)/%$(OBJEXTENSION): $(SRC_DIR)/%$(SRCEXTENSION)
-	$(C) $(CFLAGS) -c -o $@ $< $(C2OFLAGS)
-
-$(BIN_DIR)/$(TEST_EXEC): $(TEST_OBJ) $(ADDITIONALOBJFILES)
-	$(C) $(CFLAGS) -o $@ $^ $(O2EXEFLAGS)
-
-$(BIN_DIR)/%$(TEST_SUBEXT)$(OBJEXTENSION) : $(SRC_DIR)/%$(TEST_SUBEXT)$(SRCEXTENSION) $(SRC_DIR)/$(INCLUDE)/%$(TEST_SUBEXT).h
-	$(C) $(CFLAGS) -c -o $@ $< $($@) $(C2OFLAGS)
-
-$(BIN_DIR)/%$(TEST_SUBEXT)$(OBJEXTENSION): $(SRC_DIR)/%$(TEST_SUBEXT)$(SRCEXTENSION)
-	$(C) $(CFLAGS) -c -o $@ $< $(C2OFLAGS)
-
-#~UTILS
-
-.PHONY: clean reset build fullauto rbin rbuild run
-
-clean:
-	rm -rf $(BIN_DIR)/*$(OBJEXTENSION)
+all: $(STARTING_POINTS)
 
 reset:
 	rm -rf $(BIN_DIR)
 	rm -rf $(BUILD_DIR)
 
-build: $(BIN_DIR)_dir $(BUILD_DIR)_dir $(BIN_DIR)/$(EXEC)
-	cp $(BIN_DIR)/*.exe $(BUILD_DIR)
-	set -- *.dll \
-    ; if [ -e "$$1" ]; then \
-        cp $(BIN_DIR)/*.dll $(BUILD_DIR); \
-    fi
-#^remove created files if wanted clean
-ifeq (clean,$(firstword $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))))
-	rbin
-endif
+build: $(BUILD_DIR)_rule $(STARTING_POINTS:%=build.%)
+	rm -f $(BUILD_DIR)/*.d
+	rm -f $(BUILD_DIR)/*.o
 
-fullauto: build
-	$(BUILD_DIR)/$(EXEC) $(RUN_ARGS)
-
-rbin:
-	rm -rf $(BIN_DIR)
-
-rbuild:
-	rm -rf $(BUILD_DIR)
-
-run: $(BUILD_DIR)/$(EXEC) | build
-	$(BUILD_DIR)/$(EXEC) $(RUN_ARGS)
-
-test: $(BIN_DIR)_dir $(BIN_DIR)/$(TEST_EXEC)
-	$(BIN_DIR)/$(TEST_EXEC) $(RUN_ARGS)
-
-#~DIRECTORIES
-
-$(BUILD_DIR)_dir:
-	mkdir $(BUILD_DIR) -p
-
-$(BIN_DIR)_dir :
-	mkdir $(BIN_DIR) -p
-
-#~EXPLICIT DEPENDENCIES
-
-bin/rawShaders.o: $(BIN_DIR)_dir $(SHADER_FILES)
-	ld -r -b binary -o bin/rawShaders.o $(SHADER_FILES)
-
-#~DEBUG
 debug:
-	@echo There is no debug script written in $(CURDIR)/makefile :: debug
+	echo There is no debug script written in $(CURDIR)/makefile :: debug
+
+$(BIN_DIR)_rule:
+	mkdir -p $(BIN_DIR)
+
+$(BUILD_DIR)_rule:
+	mkdir -p $(BUILD_DIR)
+
+$(BIN_DIR)/%.$(OBJ_EXTENSION): $(LIB_DIR)/%
+	$(COMPILER) $(FLAGS) $(CFLAGS) $(DEBUG_FLAGS) $(DEBUG_CFLAGS) -c -o $@ $<
+
+-include $(DEP)
+$(BIN_DIR)/%.$(OBJ_EXTENSION): $(SRC_DIR)/%
+	$(COMPILER) $(FLAGS) $(CFLAGS) $(DEBUG_FLAGS) $(DEBUG_CFLAGS) -MMD -c -o $@ $<
+
+$(BUILD_DIR)/%.$(OBJ_EXTENSION): $(LIB_DIR)/%
+	$(COMPILER) $(FLAGS) $(CFLAGS) $(BUILD_FLAGS) $(BUILD_CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.$(OBJ_EXTENSION): $(SRC_DIR)/%
+	$(COMPILER) $(FLAGS) $(CFLAGS) $(BUILD_FLAGS) $(BUILD_CFLAGS) -c -o $@ $<
+
+#****************************************************************
+#						     SHADERS
+#****************************************************************
+
+shader: $(BIN_DIR)_rule $(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION)
+
+$(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION): $(SHADERS)
+	ld -r -b binary -o ./$(BIN_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION) $(SHADERS)
+
+$(BUILD_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION): $(SHADERS)
+	ld -r -b binary -o ./$(BUILD_DIR)/$(SHADER_OBJ).$(OBJ_EXTENSION) $(SHADERS)
+
+
+#****************************************************************
+#						   LEVEL EDITOR
+#****************************************************************
+EXEC=editor
+
+editor: $(BIN_DIR)_rule .editor
+
+.editor: $(OBJ)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(DEBUG_FLAGS) $(DEBUG_LFLAGS) -o $(BIN_DIR)/editor.$(EXEC_EXTENSION) $^
+
+build.editor: $(OBJ:./$(BIN_DIR)/%=./$(BUILD_DIR)/%)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(BUILD_FLAGS) $(BUILD_LFLAGS) -o $(BUILD_DIR)/editor.$(EXEC_EXTENSION) $^
+
+#****************************************************************
+#						   	   GAME
+#****************************************************************
+EXEC=game
+
+game: $(BIN_DIR)_rule .game
+
+.game: $(OBJ)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(DEBUG_FLAGS) $(DEBUG_LFLAGS) -o $(BIN_DIR)/game.$(EXEC_EXTENSION) $^
+
+build.game: $(OBJ:./$(BIN_DIR)/%=./$(BUILD_DIR)/%)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(BUILD_FLAGS) $(BUILD_LFLAGS) -o $(BUILD_DIR)/game..$(EXEC_EXTENSION) $^
+
+#****************************************************************
+#					  	     TEST EXEC
+#****************************************************************
+EXEC=test
+
+test: $(BIN_DIR)_rule .test
+
+.test: $(OBJ)
+	$(COMPILER) $(FLAGS) $(LFLAGS) $(DEBUG_FLAGS) $(DEBUG_LFLAGS) -o $(BIN_DIR)/test.$(EXEC_EXTENSION) $^
+
+build.test:
+	echo Skipping test.run build because it is a developement tool...

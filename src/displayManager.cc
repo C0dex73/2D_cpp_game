@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <string>
+#include "shader.hh"
 #include <glad/glad.h>
 
 namespace cdxg {
@@ -43,7 +44,7 @@ namespace cdxg {
         } // if glad cant init
 
         //tells opengl window size
-        glViewport(0, 0, width, height);
+        glViewport(0, 0, width, height);        
     } // void InitializeDisplayAPI()
 
     void DisplayManager::CloseWindow(){

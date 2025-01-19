@@ -18,9 +18,9 @@ namespace cdxg
 
             Update();
 
-            glfwPollEvents();
-
             Render();
+
+            glfwPollEvents();
         }
         
         DisplayManager::CloseWindow();

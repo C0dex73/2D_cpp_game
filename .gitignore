@@ -1,5 +1,4 @@
 bin/*
-lib/*.o
 .vscode/
-*.test*
+*test.*
 build/*
